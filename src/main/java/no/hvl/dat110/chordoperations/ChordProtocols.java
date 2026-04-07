@@ -6,9 +6,11 @@ package no.hvl.dat110.chordoperations;
 import java.math.BigInteger;
 import java.rmi.RemoteException;
 import java.rmi.registry.Registry;
+import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 
+import no.hvl.dat110.util.Hash;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -155,6 +157,26 @@ public class ChordProtocols {
 		
 		try {
 			logger.info("Fixing the FingerTable for the Node: "+ chordnode.getNodeName());
+
+			List<NodeInterface> fingertable = ((Node) chordnode).getFingerTable();
+
+			fingertable.clear();
+
+			int m = Hash.bitSize();
+			BigInteger modulo = Hash.addressSize();
+
+			BigInteger nodeID = chordnode.getNodeID();
+
+			for (int i = 0; i < m; i++) {
+
+				BigInteger start = nodeID.add(BigInteger.valueOf(2).pow(i)).mod(modulo);
+
+				NodeInterface succ = chordnode.findSuccessor(start);
+
+				if (succ != null) {
+					fingertable.add(succ);
+				}
+			}
 	
 			// get the finger table from the chordnode (list object)
 			

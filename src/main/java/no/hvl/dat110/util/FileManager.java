@@ -57,6 +57,15 @@ public class FileManager {
 	}
 	
 	public void createReplicaFiles() {
+
+		for (int i = 0; i < numReplicas; i++) {
+
+			String replicaName = filename + i;
+
+			BigInteger replicaID = Hash.hashOf(replicaName);
+
+			replicafiles[i] = replicaID;
+		}
 	 	
 		// set a loop where size = numReplicas
 		
@@ -66,19 +75,33 @@ public class FileManager {
 		
 		// store the hash in the replicafiles array.
 	}
-	
-    /**
-     * 
-     * @param bytesOfFile
-     * @throws RemoteException 
-     */
+
     public int distributeReplicastoPeers() throws RemoteException {
-    	
-    	// randomly appoint the primary server to this file replicas
+
     	Random rnd = new Random(); 							
     	int index = rnd.nextInt(Util.numReplicas-1);
     	
     	int counter = 0;
+
+		createReplicaFiles();
+
+		for (int i = 0; i < numReplicas; i++) {
+
+			BigInteger replicaID = replicafiles[i];
+
+			NodeInterface successor = chordnode.findSuccessor(replicaID);
+
+			if (successor != null) {
+
+				boolean isPrimary = (i == index);
+
+				successor.saveFileContent(filename, replicaID, bytesOfFile, isPrimary);
+
+				successor.addKey(replicaID);
+
+				counter++;
+			}
+		}
 	
     	// Task1: Given a filename, make replicas and distribute them to all active peers such that: pred < replica <= peer
     	
@@ -109,7 +132,25 @@ public class FileManager {
 	public Set<Message> requestActiveNodesForFile(String filename) throws RemoteException {
 
 		this.filename = filename;
-		activeNodesforFile = new HashSet<Message>(); 
+		activeNodesforFile = new HashSet<Message>();
+
+		createReplicaFiles();
+
+		for (int i = 0; i < numReplicas; i++) {
+
+			BigInteger replicaID = replicafiles[i];
+
+			NodeInterface successor = chordnode.findSuccessor(replicaID);
+
+			if (successor != null) {
+
+				Message metadata = successor.getFilesMetadata().get(replicaID);
+
+				if (metadata != null) {
+					activeNodesforFile.add(metadata);
+				}
+			}
+		}
 
 		// Task: Given a filename, find all the peers that hold a copy of this file
 		
@@ -131,6 +172,14 @@ public class FileManager {
 	 * @return 
 	 */
 	public NodeInterface findPrimaryOfItem() {
+		if (activeNodesforFile == null || activeNodesforFile.isEmpty())
+			return null;
+
+		for (Message msg : activeNodesforFile) {
+			if (msg.isPrimaryServer()) {
+				return Util.getProcessStub(msg.getNodeName(), msg.getPort());
+			}
+		}
 
 		// Task: Given all the active peers of a file (activeNodesforFile()), find which is holding the primary copy
 		
@@ -238,7 +287,7 @@ public class FileManager {
 		return sizeOfByte;
 	}
 	/**
-	 * @param size the size to set
+	 * @param sizeOfByte the size to set
 	 */
 	public void setSizeOfByte(String sizeOfByte) {
 		this.sizeOfByte = sizeOfByte;
